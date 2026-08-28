@@ -1,0 +1,18 @@
+{
+  "dataset_root": "dataset/processed",
+  "test_patient": "p5",
+  "seed": 42,
+  "image_size": 256,
+  "batch_size": 4,
+  "num_workers": 0,
+  "epochs": 10,
+  "learning_rate": 0.0001,
+  "architectures": {
+    "unet": {"base_filters": 32},
+    "segformer_b0": {"model_name": "nvidia/mit-b0"},
+    "segformer_b1": {"model_name": "nvidia/mit-b1"},
+    "segformer_b2": {"model_name": "nvidia/mit-b2"},
+    "sam2": {"enabled": true, "variant": "sam2.1_hiera_small", "model_config": "configs/sam2.1/sam2.1_hiera_s.yaml", "checkpoint": "checkpoints/sam2.1_hiera_small.pt", "prompt_strategy": "article_eroded_random_positive_points", "freeze_image_encoder": true, "steps": 600, "gradient_accumulation_steps": 8}
+  },
+  "notes": "SAM2 small is configured as a CUDA-only opt-in experiment. Download the checkpoint in the cloud, install the official SAM2 package, and run sam2_train.py with --execute there."
+}
