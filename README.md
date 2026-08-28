@@ -43,3 +43,30 @@ python3 sam2_train.py --dataset-root /path/to/dataset/processed --checkpoint che
 ```
 
 Add `--execute` only after the dry-run succeeds. The SAM2 pipeline freezes the image encoder and samples random positive points from the 5x5-eroded foreground mask. Use `python -u` for live RunPod logs; the runners also flush progress messages explicitly.
+
+## Cloud data layout
+
+dataset is at Kaggle. Download with: 
+
+```
+import kagglehub
+
+export KAGGLE_API_TOKEN=xxxxxxxxxxxxxx
+
+# Download latest version
+path = kagglehub.dataset_download("rngarcia/acalasia-partial-0826")
+
+print("Path to dataset files:", path)
+```
+
+The runner expects, inside the main directory:
+
+```text
+dataset/processed/p1/p1_images/
+dataset/processed/p1/p1_masks/
+...
+dataset/processed/p5/p5_images/
+dataset/processed/p5/p5_masks/
+```
+
+The default protocol holds out p5, performs leave-one-patient-out cross-validation over p1–p4, and balances training sampling by patient.
