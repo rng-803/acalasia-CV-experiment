@@ -19,6 +19,16 @@ import numpy as np
 from data import Sample, balanced_weights, discover, patient_counts, patient_cv_folds, split
 
 ROOT = Path(__file__).resolve().parents[1]
+AGGREGATE_METRIC_NAMES = (
+    "dice_background",
+    "dice_complete_myotomy",
+    "dice_incomplete_myotomy",
+    "foreground_macro_dice",
+    "iou_background",
+    "iou_complete_myotomy",
+    "iou_incomplete_myotomy",
+    "foreground_macro_iou",
+)
 
 
 def require_torch() -> None:
@@ -231,6 +241,14 @@ def write_csv(path: Path, rows: list[dict]) -> None:
         writer = csv.DictWriter(file, fieldnames=fields); writer.writeheader(); writer.writerows(rows)
 
 
+def aggregate_metric_rows(fold_rows: list[dict]) -> list[dict]:
+    rows = []
+    for metric in AGGREGATE_METRIC_NAMES:
+        values = [row[metric] for row in fold_rows if row.get(metric) is not None]
+        rows.append({"metric": metric, "folds": len(values), "mean": float(np.mean(values)) if values else None, "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0 if values else None})
+    return rows
+
+
 def execute(config: dict, architecture: str, dataset_root: Path, output_dir: Path, local_files_only: bool, run_name: str | None = None, overlay_count: int = 5) -> None:
     require_torch()
     import torch
@@ -288,10 +306,7 @@ def execute(config: dict, architecture: str, dataset_root: Path, output_dir: Pat
         save_overlays(model, fold_val, int(config.get("image_size", 256)), device, architecture, fold_dir / "overlays", overlay_count)
         write_csv(fold_dir / "history.csv", [row for row in history_rows if row["fold"] == fold["fold"]])
     write_csv(run_dir / "history.csv", history_rows); write_csv(run_dir / "fold_metrics.csv", fold_rows)
-    aggregate_rows = []
-    for metric in ("foreground_macro_dice", "foreground_macro_iou", "dice_complete_myotomy", "dice_incomplete_myotomy", "iou_complete_myotomy", "iou_incomplete_myotomy"):
-        values = [row[metric] for row in fold_rows if row[metric] is not None]
-        aggregate_rows.append({"metric": metric, "folds": len(values), "mean": float(np.mean(values)) if values else None, "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0 if values else None})
+    aggregate_rows = aggregate_metric_rows(fold_rows)
     write_csv(run_dir / "aggregate_metrics.csv", aggregate_rows)
     summary = {"run_name": safe_name, "architecture": architecture, "test_patient": config["test_patient"], "fold_count": len(fold_rows), "aggregate_metrics": aggregate_rows}
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

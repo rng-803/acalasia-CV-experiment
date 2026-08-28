@@ -137,7 +137,23 @@ bash download_sam2_small.sh checkpoints
 python3 sam2_train.py --dataset-root /path/to/dataset/processed --checkpoint checkpoints/sam2.1_hiera_small.pt --dry-run
 ```
 
-Add `--execute` only after the dry-run succeeds. The SAM2 pipeline freezes the image encoder and samples random positive points from the 5x5-eroded foreground mask. Use `python -u` for live RunPod logs; the runners also flush progress messages explicitly.
+Add `--execute` only after the dry-run succeeds. The SAM2 pipeline freezes the image encoder and samples one positive point from each present class's 5x5-eroded region, with a class-specific binary training target. Use `python -u` for live RunPod logs; the runners also flush progress messages explicitly.
+
+SAM2 now writes the same run structure as the other architectures under `runs/experiments/<run-name>/`: `run_config.json`, root and per-fold `history.csv`, `fold_metrics.csv`, `aggregate_metrics.csv`, `summary.json`, `fold_XX/metrics.json`, `fold_XX/best_model.pt`, and `fold_XX/overlays/`. Validation records include Dice and IoU for background, complete myotomy, and incomplete myotomy, plus foreground macro Dice/IoU and prompt IoU. Cross-fold aggregates contain Dice and IoU for every class plus the foreground macro metrics.
+
+SAM2 remains prompt-conditioned: validation uses one deterministic annotation-derived positive point per foreground class. The run configuration records this explicitly, because its metrics are not directly equivalent to the unprompted U-Net, ResNet34-U-Net, ConvNeXt, and SegFormer metrics.
+
+Use an explicit run name:
+
+```bash
+python3 -u sam2_train.py \
+  --dataset-root /path/to/dataset/processed \
+  --checkpoint checkpoints/sam2.1_hiera_small.pt \
+  --output-dir runs/experiments \
+  --run-name sam2_small_seed42 \
+  --overlay-count 5 \
+  --execute
+```
 
 Do not place the upstream clone in a child directory named exactly `sam2` while running `sam2_train.py` from this directory. The repository name shadows the installed Python package, and official SAM2 detects and rejects that layout. If it was already cloned as `sam2`, rename and reinstall it before continuing:
 

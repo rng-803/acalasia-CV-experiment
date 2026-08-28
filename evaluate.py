@@ -6,17 +6,15 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
-
 from data import discover, split
-from run_experiment import build_model, load_config, make_dataset, resolve_dataset
+from run_experiment import build_model, load_config, make_dataset, metric_values, resolve_dataset, save_overlays
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="experiments/configs.json")
     p.add_argument("--architecture", required=True, choices=["unet", "resnet34_unet", "convnext_tiny_unet", "segformer_b0", "segformer_b1", "segformer_b2"])
-    p.add_argument("--checkpoint", required=True); p.add_argument("--dataset-root"); p.add_argument("--output", default="test_metrics.json"); p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--checkpoint", required=True); p.add_argument("--dataset-root"); p.add_argument("--output", default="test_metrics.json"); p.add_argument("--overlay-dir"); p.add_argument("--overlay-count", type=int, default=5); p.add_argument("--dry-run", action="store_true")
     args = p.parse_args(); config = load_config(args.config); root = resolve_dataset(config, args.dataset_root); _, test = split(discover(root), config["test_patient"])
     if args.dry_run:
         print(json.dumps({"status": "ok", "mode": "dry-run", "test_patient": config["test_patient"], "test_images": len(test), "checkpoint": str(Path(args.checkpoint).resolve()), "note": "No checkpoint was loaded and no evaluation was run."}, indent=2)); return
@@ -37,9 +35,13 @@ def main() -> None:
         for images, masks in loader:
             logits = model(images.to(device)).logits if args.architecture.startswith("segformer_") else model(images.to(device)); logits = F.interpolate(logits, size=masks.shape[-2:], mode="bilinear", align_corners=False)
             pred = logits.argmax(1).cpu(); valid = (masks >= 0) & (masks < 3); cm += torch.bincount((3 * masks[valid] + pred[valid]), minlength=9).reshape(3, 3)
-    cm_np = cm.numpy().astype(float); tp = np.diag(cm_np); den = cm_np.sum(1) + cm_np.sum(0); dice = [None if den[i] == 0 else float(2 * tp[i] / den[i]) for i in range(3)]
-    result = {"architecture": args.architecture, "test_patient": config["test_patient"], "test_images": len(test), "dice_background": dice[0], "dice_complete_myotomy": dice[1], "dice_incomplete_myotomy": dice[2], "foreground_macro_dice": float(np.mean([x for x in dice[1:] if x is not None]))}
-    Path(args.output).write_text(json.dumps(result, indent=2) + "\n"); print(json.dumps(result, indent=2))
+    result = {"architecture": args.architecture, "test_patient": config["test_patient"], "test_images": len(test), **metric_values(cm), "confusion_matrix": cm.tolist()}
+    output_path = Path(args.output); output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, indent=2) + "\n")
+    if args.overlay_count > 0:
+        overlay_dir = Path(args.overlay_dir) if args.overlay_dir else output_path.parent / "test_overlays"
+        save_overlays(model, test, int(config.get("image_size", 256)), device, args.architecture, overlay_dir, args.overlay_count)
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__": main()
