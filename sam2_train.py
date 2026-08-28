@@ -106,6 +106,8 @@ def execute(args, dataset_root: Path, checkpoint: Path) -> None:
             scaler.scale(loss / args.accumulation_steps).backward()
             if step % args.accumulation_steps == 0:
                 scaler.unscale_(optimizer); torch.nn.utils.clip_grad_norm_(params, 1.0); scaler.step(optimizer); scaler.update()
+            if step % 10 == 0:
+                print(f"fold={fold['fold']} step={step}/{args.steps} train_loss={float(loss.detach()):.4f} prompt_iou={float(score.detach()):.4f}", flush=True)
             if step % args.eval_every == 0:
                 predictor.model.eval(); vals = []
                 with torch.no_grad():

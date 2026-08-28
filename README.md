@@ -9,7 +9,25 @@ bash setup_local_env.sh
 source .venv/bin/activate
 python check_environment.py --architecture unet
 python validate_setup.py --dataset-root /path/to/dataset/processed --test-patient p5
-python run_experiment.py --config configs.json --architecture unet --dry-run
+python -u run_experiment.py --config configs.json --architecture unet --dry-run
+```
+
+For SegFormer, either allow Hugging Face network access and omit `--local-files-only`, or pre-cache the selected model before using offline mode:
+
+```bash
+python download_hf_model.py --model nvidia/mit-b0
+python -u run_experiment.py --config configs.json --architecture segformer_b0 --local-files-only --execute
+```
+
+Repeat the download with `nvidia/mit-b1` or `nvidia/mit-b2` for the larger variants. The model cache is normally under `~/.cache/huggingface`; preserve or recreate it on the cloud volume if pods are ephemeral.
+
+## Run outputs and comparison
+
+Every execution creates a unique directory under `runs/experiments/` unless `--run-name` is supplied. A run contains its complete `run_config.json`, per-epoch `history.csv`, one directory per CV fold, `fold_metrics.csv`, `aggregate_metrics.csv`, checkpoints, and `overlays/` panels showing original, ground truth, prediction, and blend. This prevents separate experiments from overwriting one another.
+
+```bash
+python -u run_experiment.py --config configs.json --architecture segformer_b0 --run-name segformer_b0_seed42 --execute
+python compare_runs.py --runs-root runs/experiments --output runs/experiment_comparison.csv
 ```
 
 Place the prepared dataset beside this repository as `dataset/processed/`, or pass `--dataset-root`. It must contain `p1/` through `p5/` patient folders with matching `<patient>_images/` and `<patient>_masks/` directories. Data, checkpoints, and outputs are intentionally not committed.
@@ -24,4 +42,4 @@ bash download_sam2_small.sh checkpoints
 python3 sam2_train.py --dataset-root /path/to/dataset/processed --checkpoint checkpoints/sam2.1_hiera_small.pt --dry-run
 ```
 
-Add `--execute` only after the dry-run succeeds. The SAM2 pipeline freezes the image encoder and samples random positive points from the 5x5-eroded foreground mask.
+Add `--execute` only after the dry-run succeeds. The SAM2 pipeline freezes the image encoder and samples random positive points from the 5x5-eroded foreground mask. Use `python -u` for live RunPod logs; the runners also flush progress messages explicitly.
