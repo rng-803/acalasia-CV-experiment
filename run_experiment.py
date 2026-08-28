@@ -54,6 +54,12 @@ def resolve_dataset(config: dict, override: str | None) -> Path:
 def validate_architecture(name: str, options: dict, local_files_only: bool) -> str:
     if name == "unet":
         return "RESNET/teste_vid_01/model_unet.py"
+    if name == "resnet34_unet":
+        try:
+            import torchvision  # noqa: F401
+        except ImportError:
+            return "torchvision ResNet34 (unavailable: install requirements-experiments.txt)"
+        return "torchvision ResNet34 encoder + project U-Net decoder"
     if name.startswith("segformer_"):
         model_name = options.get("model_name", "nvidia/mit-" + name.rsplit("_", 1)[1])
         try:
@@ -138,6 +144,13 @@ def build_model(architecture: str, options: dict, local_files_only: bool = False
             sys.path.insert(0, str(ROOT / "RESNET" / "teste_vid_01"))
             from model_unet import UNet
         return UNet(3, 3, base_filters=int(options.get("base_filters", 32)))
+    if architecture == "resnet34_unet":
+        from resnet34_unet import ResNet34UNet
+        return ResNet34UNet(
+            num_classes=3,
+            pretrained=bool(options.get("pretrained", True)),
+            decoder_channels=int(options.get("decoder_channels", 64)),
+        )
     from transformers import SegformerForSemanticSegmentation
     return SegformerForSemanticSegmentation.from_pretrained(options.get("model_name", f"nvidia/mit-{architecture[-2:]}"), num_labels=3, ignore_mismatched_sizes=True, local_files_only=local_files_only)
 
@@ -268,7 +281,7 @@ def execute(config: dict, architecture: str, dataset_root: Path, output_dir: Pat
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--config", default="experiments/configs.json"); p.add_argument("--architecture", required=True, choices=["unet", "segformer_b0", "segformer_b1", "segformer_b2", "sam2"])
+    p.add_argument("--config", default="experiments/configs.json"); p.add_argument("--architecture", required=True, choices=["unet", "resnet34_unet", "segformer_b0", "segformer_b1", "segformer_b2", "sam2"])
     p.add_argument("--dataset-root"); p.add_argument("--output-dir", default="runs/experiments"); p.add_argument("--run-name", help="Unique child directory name; defaults to UTC timestamp plus architecture"); p.add_argument("--overlay-count", type=int, default=5); p.add_argument("--local-files-only", action="store_true"); p.add_argument("--execute", action="store_true"); p.add_argument("--dry-run", action="store_true", help="Explicit no-training mode (the default)")
     args = p.parse_args(); config = load_config(args.config); root = resolve_dataset(config, args.dataset_root)
     if not args.execute or args.dry_run: dry_run(config, args.architecture, root, args.local_files_only)

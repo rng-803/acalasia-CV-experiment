@@ -9,6 +9,7 @@
   "learning_rate": 0.0001,
   "architectures": {
     "unet": {"base_filters": 32},
+    "resnet34_unet": {"pretrained": true, "decoder_channels": 64},
     "segformer_b0": {"model_name": "nvidia/mit-b0"},
     "segformer_b1": {"model_name": "nvidia/mit-b1"},
     "segformer_b2": {"model_name": "nvidia/mit-b2"},
