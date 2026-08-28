@@ -1,6 +1,6 @@
 # Segmentation experiment runner
 
-Standalone training/evaluation repository for patient-wise UNet, ResNet34-U-Net, SegFormer, and SAM2.1 Hiera-S small experiments.
+Standalone training/evaluation repository for patient-wise UNet, ResNet34-U-Net, ConvNeXt-Tiny-U-Net, SegFormer, and SAM2.1 Hiera-S small experiments.
 
 All commands in this guide assume that the terminal is opened in this `experiments/` directory:
 
@@ -18,6 +18,7 @@ Pass exactly one of these strings to `--architecture`:
 |---|---|---|
 | Classical U-Net | `unet` | `run_experiment.py` |
 | ResNet34-encoder U-Net | `resnet34_unet` | `run_experiment.py` |
+| ConvNeXt-Tiny-encoder U-Net | `convnext_tiny_unet` | `run_experiment.py` |
 | SegFormer B0 | `segformer_b0` | `run_experiment.py` |
 | SegFormer B1 | `segformer_b1` | `run_experiment.py` |
 | SegFormer B2 | `segformer_b2` | `run_experiment.py` |
@@ -43,6 +44,7 @@ A dry run validates the dataset and prints the patient-wise cross-validation pla
 ```bash
 python -u run_experiment.py --config configs.json --architecture unet --dry-run
 python -u run_experiment.py --config configs.json --architecture resnet34_unet --dry-run
+python -u run_experiment.py --config configs.json --architecture convnext_tiny_unet --dry-run
 python -u run_experiment.py --config configs.json --architecture segformer_b0 --dry-run
 python -u run_experiment.py --config configs.json --architecture segformer_b1 --dry-run
 python -u run_experiment.py --config configs.json --architecture segformer_b2 --dry-run
@@ -52,11 +54,12 @@ The default protocol holds out `p5` as the locked test patient and performs leav
 
 ## Training commands
 
-Add `--execute` to start training. The same command pattern works for the classical U-Net, ResNet34-U-Net, and SegFormer variants:
+Add `--execute` to start training. The same command pattern works for the classical U-Net, ResNet34-U-Net, ConvNeXt-Tiny-U-Net, and SegFormer variants:
 
 ```bash
 python -u run_experiment.py --config configs.json --architecture unet --execute
 python -u run_experiment.py --config configs.json --architecture resnet34_unet --execute
+python -u run_experiment.py --config configs.json --architecture convnext_tiny_unet --execute
 python -u run_experiment.py --config configs.json --architecture segformer_b0 --execute
 python -u run_experiment.py --config configs.json --architecture segformer_b1 --execute
 python -u run_experiment.py --config configs.json --architecture segformer_b2 --execute
@@ -73,6 +76,22 @@ python -u run_experiment.py \
 ```
 
 Useful options are `--dataset-root PATH`, `--output-dir PATH`, `--run-name NAME`, `--overlay-count N`, and `--local-files-only` for offline Hugging Face model use. The default dataset root is `dataset/processed`.
+
+ConvNeXt-Tiny and ResNet34 weights are downloaded by torchvision on first use. Cache ConvNeXt-Tiny before an offline cloud run with:
+
+```bash
+python download_torchvision_model.py --model convnext_tiny
+```
+
+Then train with an identifiable run name:
+
+```bash
+python -u run_experiment.py \
+  --config configs.json \
+  --architecture convnext_tiny_unet \
+  --run-name convnext_tiny_unet_seed42 \
+  --execute
+```
 
 For SegFormer, either allow Hugging Face network access and omit `--local-files-only`, or pre-cache the selected model before using offline mode:
 
@@ -104,7 +123,7 @@ python -u evaluate.py \
   --output runs/experiments/resnet34_unet_seed42/test_metrics.json
 ```
 
-Replace `resnet34_unet` with `unet`, `segformer_b0`, `segformer_b1`, or `segformer_b2` as required. Add `--dry-run` to validate the selection without loading the checkpoint.
+Replace `resnet34_unet` with `unet`, `convnext_tiny_unet`, `segformer_b0`, `segformer_b1`, or `segformer_b2` as required. Add `--dry-run` to validate the selection without loading the checkpoint.
 
 Place the prepared dataset beside this repository as `dataset/processed/`, or pass `--dataset-root`. It must contain `p1/` through `p5/` patient folders with matching `<patient>_images/` and `<patient>_masks/` directories. Data, checkpoints, and outputs are intentionally not committed.
 
@@ -112,13 +131,29 @@ Place the prepared dataset beside this repository as `dataset/processed/`, or pa
 
 ```bash
 python3 -m pip install -r requirements-sam2.txt
-git clone https://github.com/facebookresearch/sam2.git
-(cd sam2 && SAM2_BUILD_CUDA=1 python3 -m pip install -e .)
+git clone https://github.com/facebookresearch/sam2.git sam2_repo
+(cd sam2_repo && SAM2_BUILD_CUDA=1 python3 -m pip install -e .)
 bash download_sam2_small.sh checkpoints
 python3 sam2_train.py --dataset-root /path/to/dataset/processed --checkpoint checkpoints/sam2.1_hiera_small.pt --dry-run
 ```
 
 Add `--execute` only after the dry-run succeeds. The SAM2 pipeline freezes the image encoder and samples random positive points from the 5x5-eroded foreground mask. Use `python -u` for live RunPod logs; the runners also flush progress messages explicitly.
+
+Do not place the upstream clone in a child directory named exactly `sam2` while running `sam2_train.py` from this directory. The repository name shadows the installed Python package, and official SAM2 detects and rejects that layout. If it was already cloned as `sam2`, rename and reinstall it before continuing:
+
+```bash
+mv sam2 sam2_repo
+(cd sam2_repo && SAM2_BUILD_CUDA=1 python3 -m pip install -e .)
+```
+
+If `sam2_train.py` reports `unrecognized arguments: checkpoints/sam2.1_hiera_small.pt`, the checkpoint was passed positionally. Pass it as an option value instead:
+
+```bash
+python3 sam2_train.py \
+  --dataset-root /path/to/dataset/processed \
+  --checkpoint checkpoints/sam2.1_hiera_small.pt \
+  --dry-run
+```
 
 ## Cloud data layout
 

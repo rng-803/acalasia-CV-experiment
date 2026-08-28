@@ -21,7 +21,7 @@ from sam2_points import sample_positive_points
 
 
 SAM2_MODEL_CONFIG = "configs/sam2.1/sam2.1_hiera_s.yaml"
-SAM2_CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything_2/072824/sam2.1_hiera_small.pt"
+SAM2_CHECKPOINT_URL = "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt"
 
 
 def load_sample(sample: Sample, max_side: int = 1024) -> tuple[np.ndarray, np.ndarray]:

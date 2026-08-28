@@ -15,7 +15,7 @@ from run_experiment import build_model, load_config, make_dataset, resolve_datas
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--config", default="experiments/configs.json")
-    p.add_argument("--architecture", required=True, choices=["unet", "resnet34_unet", "segformer_b0", "segformer_b1", "segformer_b2"])
+    p.add_argument("--architecture", required=True, choices=["unet", "resnet34_unet", "convnext_tiny_unet", "segformer_b0", "segformer_b1", "segformer_b2"])
     p.add_argument("--checkpoint", required=True); p.add_argument("--dataset-root"); p.add_argument("--output", default="test_metrics.json"); p.add_argument("--dry-run", action="store_true")
     args = p.parse_args(); config = load_config(args.config); root = resolve_dataset(config, args.dataset_root); _, test = split(discover(root), config["test_patient"])
     if args.dry_run:
@@ -26,8 +26,8 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_options = dict(config["architectures"][args.architecture])
     # The checkpoint already contains the encoder weights. Avoid a second
-    # torchvision download when evaluating a ResNet34-U-Net checkpoint.
-    if args.architecture == "resnet34_unet":
+    # torchvision download when evaluating pretrained CNN checkpoints.
+    if args.architecture in {"resnet34_unet", "convnext_tiny_unet"}:
         model_options["pretrained"] = False
     model = build_model(args.architecture, model_options).to(device)
     saved = torch.load(args.checkpoint, map_location=device); model.load_state_dict(saved.get("model", saved), strict=True); model.eval()

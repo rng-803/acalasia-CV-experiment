@@ -10,6 +10,7 @@
   "architectures": {
     "unet": {"base_filters": 32},
     "resnet34_unet": {"pretrained": true, "decoder_channels": 64},
+    "convnext_tiny_unet": {"variant": "tiny", "pretrained": true, "decoder_channels": [256, 128, 64], "decoder_norm": "groupnorm", "dropout": 0.0},
     "segformer_b0": {"model_name": "nvidia/mit-b0"},
     "segformer_b1": {"model_name": "nvidia/mit-b1"},
     "segformer_b2": {"model_name": "nvidia/mit-b2"},
